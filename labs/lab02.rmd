@@ -1,7 +1,7 @@
 ---
 title: "Lab 2"
 author: "Namisha Singh"
-date: "11:59PM February 23"
+date: "11:59PM February 24"
 output:
   word_document: default
   pdf_document: default
