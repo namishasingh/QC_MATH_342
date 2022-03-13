@@ -259,7 +259,7 @@ for (j in 1:length(N)){
   for (i in 1:Nsim){
     X=matrix(1,nrow=N[j],ncol=2)
     X[,2]=rnorm(N[j])
-    cos_theta= t(X[,1]%*%X[,2]) / (norm_vec(X[,1])*norm_vec(X[,2]))
+    cos_theta= t(X[,1]%*%X[,2]) / (norm_squared(X[,1])*norm_squared(X[,2]))
     angles[i,j]=abs(90-acos(cos_theta)*180/pi)
   }
 }
