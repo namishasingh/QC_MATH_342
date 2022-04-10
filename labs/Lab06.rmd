@@ -1,0 +1,118 @@
+---
+title: "Lab 6"
+author: "Namisha Singh"
+output: pdf_document
+---
+
+#Visualization with the package ggplot2
+
+I highly recommend using the [ggplot cheat sheet](https://rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf) as a reference resource. You will see questions that say "Create the best-looking plot". Among other things you may choose to do, remember to label the axes using real English, provide a title and subtitle. You may want to pick a theme and color scheme that you like and keep that constant throughout this lab. The default is fine if you are running short of time.
+
+Load up the `GSSvocab` dataset in package `carData` as `X` and drop all observations with missing measurements. This will be a very hard visualization exercise since there is not a good model for vocab.
+
+```{r}
+pacman::p_load(carData) 
+X = carData::GSSvocab
+X = na.omit(X)
+```
+
+Briefly summarize the documentation on this dataset. What is the data type of each variable? What do you think is the response variable the collectors of this data had in mind?
+
+The variables in this data set are as follows: 
+(1) year: This is an ordinal categorical variable as it has the years factored with levels. 
+(2) gender: This is a nominal categorical variable as gender could either be male or female however, it could be made binary. 
+(3) ageGroup: This is an ordinal categorical variable because it has the age groups listed with an increasing order. 
+(4) educGroup: This is an ordinal categorical variable as well because it exploring the grouped education level that's increasing in order. 
+(5) Number of words out of 10 correct is an ordinal categorical variable as well because it is increasing order 
+(6)(7) Age and educ are both discrete variables since they are whole numbers and they cannot reach infinity because they have limits.
+(8) Native born is a binary variable since the answer could either be yes or no. 
+
+Researchers that obtained this data were aiming to look at the above variables and explore the relationships that exist between them. 
+
+Create two different plots and identify the best-looking plot you can to examine the `age` variable. Save the best looking plot as an appropriately-named PDF.
+
+```{r}
+base = ggplot(X,aes(age) )  
+# base+geom_area()
+base+geom_histogram()
+base+geom_density()
+# base+geom_dotplot()
+base+ geom_freqpoly()
+```
+
+Create two different plots and identify the best looking plot you can to examine the `vocab` variable. Save the best looking plot as an appropriately-named PDF.
+
+```{r}
+X$vocab = factor(X$vocab)
+base=ggplot(X,aes(vocab))
+base+geom_bar()
+base+geom_bar()
+```
+
+Create the best-looking plot you can to examine the `ageGroup` variable by `gender`. Does there appear to be an association? There are many ways to do this.
+
+```{r}
+ggplot(X) + geom_jitter(aes(x= ageGroup, y = gender), size = 0.0000000001, shape = 20)
+```
+
+Create the best-looking plot you can to examine the `vocab` variable by `age`. Does there appear to be an association?
+
+```{r}
+ggplot(X) + geom_boxplot(aes(x=vocab, y = age))
+```
+
+Add an estimate of $f(x)$ using the smoothing geometry to the previous plot. Does there appear to be an association now?
+
+```{r}
+X$Vocab = as.numeric(X$Vocab)
+ggplot(X) + geom_jitter(aes(x= vocab, y = age)) + geom_smooth(aes(x= vocab, y = age))
+```
+
+Using the plot from the previous question, create the best looking plot overloading with variable `gender`. Does there appear to be an interaction of `gender` and `age`?
+
+```{r}
+ggplot(X) + geom_boxplot(aes(fill = gender, x=vocab, y = age)) 
+
+#It appears as though females tend to have a higher average age group, especially if they're getting more variables correct. 
+```
+
+
+Using the plot from the previous question, create the best looking plot overloading with variable `nativeBorn`. Does there appear to be an interaction of `nativeBorn` and `age`?
+
+```{r}
+X$age = as.numeric(X$age)
+ggplot(X) + geom_col(aes(fill = nativeBorn, x=vocab, y = age))  +
+ geom_col(aes(fill = nativeBorn,x=vocab, y = age))
+```
+
+Create two different plots and identify the best-looking plot you can to examine the `vocab` variable by `educGroup`. Does there appear to be an association?
+
+```{r}
+X$vocab = as.numeric(X$vocab)
+
+#1
+ggplot(X) + geom_count(aes(x=educGroup, y = vocab)) 
+#2 
+ggplot(X) + geom_col(aes(x=educGroup, y = vocab)) 
+# 3
+ggplot(X) + geom_col(aes(fill = educGroup, x=vocab, y = age)) 
+
+#I think the best-looking plot in order to examine vocab by educGroup is Plot 2 as it allows you to see the differences and association between all the different education groups. It appears as though there is a slight association and those that are in the educGroup of 12 years or 13-15 years seem to be getting more vocab words correct. 
+```
+
+Using the best-looking plot from the previous question, create the best looking overloading with variable `gender`. Does there appear to be an interaction of `gender` and `educGroup`?
+
+```{r}
+X$vocab = as.numeric(X$vocab)
+ggplot(X) + geom_count(aes(color=gender,x=educGroup, y = vocab)) 
+ggplot(X) + geom_col(aes(fill = gender, x=educGroup, y = vocab)) 
+#From the graphs, it seems as though females are a larger group and guess more words. There does not seem to be much of an association between educGroup and vocab however 
+```
+
+Using facets, examine the relationship between `vocab` and `ageGroup`. You can drop year level `(Other)`. Are we getting dumber?
+
+```{r}
+X$vocab = as.numeric(X$vocab)
+ggplot(X) + geom_count(aes(x=ageGroup, y = vocab)) 
+ggplot(X) + geom_col(aes(x=ageGroup, y = vocab)) 
+```
