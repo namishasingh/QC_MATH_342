@@ -113,6 +113,6 @@ Using facets, examine the relationship between `vocab` and `ageGroup`. You can d
 
 ```{r}
 X$vocab = as.numeric(X$vocab)
-ggplot(X) + geom_count(aes(x=ageGroup, y = vocab)) 
-ggplot(X) + geom_col(aes(x=ageGroup, y = vocab)) 
+ggplot(X) + geom_count(aes(x=ageGroup, y = vocab)) + facet_grid(vocab ~ ageGroup) + theme(strip.background = element_rect(colour = "black", fill = "white", linetype = "solid"))
+#ggplot(X) + geom_col(aes(x=ageGroup, y = vocab)) 
 ```
