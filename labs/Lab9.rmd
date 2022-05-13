@@ -291,3 +291,9 @@ repeat {
 Plot the in-sample and oos (select set) Brier score by $p$. Does this look like what's expected?
 ```{r}
 in_sample = -(ytrain - phat_train)**2
+pacman::p_load(ggplot2)
+ggplot(data.frame(phat_train = phat_train, ytrain)) +
+  geom_histogram(aes(x = phat_train, fill = ytrain), alpha = 0.5)
+phat_test = predict(logistic_mod, adult_test, type = "response")
+ggplot(data.frame(phat_test = phat_test, y_test = ytest)) +
+  geom_histogram(aes(x = phat_test, fill = ytest), alpha = 0.5)
