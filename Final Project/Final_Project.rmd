@@ -1,0 +1,443 @@
+Title: Math 342W Final Project
+Author:  Namisha Singh
+Output: PDF Document
+Date: May 25, 2022
+
+
+Import the csv data file:
+```{r}
+pacman::p_load(tidyverse, magrittr, data.table, R.utils)
+HousingData = fread("https://raw.githubusercontent.com/kapelner/QC_MATH_342W_Spring_2022/main/writing_assignments/housing_data_2016_2017.csv")
+
+nrow(HousingData) #2,230 rows
+ncol(HousingData) #55 columns
+```
+
+
+We need to remove unnecessary data in order to clean the dataset and make it more efficient for modeling. To do this, we will get rid of columns that are not needed, include a lot of missing data (NAs), and repeat the same information. 
+
+```{r}
+HousingData %<>%
+  select(-c(HITId, HITId,	HITTypeId,	Title,	Description,	Keywords,	Reward,	CreationTime,	MaxAssignments,	RequesterAnnotation,	AssignmentDurationInSeconds,	AutoApprovalDelayInSeconds,	Expiration,	NumberOfSimilarHITs,	LifetimeInSeconds,	AssignmentId,	WorkerId,	AssignmentStatus,	AcceptTime,	SubmitTime,	AutoApprovalTime,	ApprovalTime,	RejectionTime,	RequesterFeedback,	WorkTimeInSeconds,	LifetimeApprovalRate,	Last30DaysApprovalRate,	Last7DaysApprovalRate))
+
+
+```
+To deal with missing values, we can start off by also deleting values that have more than 70% of the values missing. 
+```{r}
+colMeans(is.na(HousingData))
+#This includes common_charges, date_of_sale, num_half_bathrooms, pct_tax_deductibl,total_taxes, garage_exists. 
+
+HousingData %<>%
+  select(-c(common_charges, date_of_sale, num_half_bathrooms, pct_tax_deductibl,total_taxes, garage_exists))
+
+```
+Now, we will continue to clean the data by starting off with the nominal features. We will be binarizing features that have only two values (no(0), yes(1)). This includes cats_allowed, coop_condo, and dogs_allowed. The rest of the nominal features will be factorized, which means that the data for these features will be stored as numerical levels. 
+```{r}
+#Binarize Dogs_allowed
+HousingData = HousingData %>%
+  mutate(dogs_allowed = ifelse(dogs_allowed == "yes",1,0))
+
+#Binarize Cats_allowed
+HousingData = HousingData %>%
+  mutate(cats_allowed = ifelse(cats_allowed == "yes",1,0))
+
+#Binarize coop_condo: If it is a condo, display one and if it is a coop then display 0. 
+HousingData = HousingData %>%
+  mutate(coop_condo = ifelse(coop_condo == "condo",1,0))
+
+#print(HousingData)
+```
+Factorize the other nominal features:
+```{r}
+#We need to make sure that there's consistency in each column so the level could be assigned properly. Therefore, we will make all charachters lower case.
+HousingData %<>%
+  mutate_at(c("dining_room_type", "fuel_type", "kitchen_type"), tolower)
+
+
+#kitchen_type:
+
+table(HousingData$kitchen_type)
+#There are evidently some inconsistencies as there is a random "1955" as one level, and then there are other values where the kitchen_type is spelled differently so it is assigned another level. We will need to fix this. 
+
+HousingData$kitchen_type[HousingData$kitchen_type == "1955"] <- "efficiency"
+HousingData$kitchen_type[HousingData$kitchen_type == "efficiemcy"] <- "efficiency"
+HousingData$kitchen_type[HousingData$kitchen_type == "eat in"] <- "eatin"
+HousingData$kitchen_type[HousingData$kitchen_type == "Efficiency"] <- "efficiency"
+HousingData$kitchen_type[HousingData$kitchen_type == "efficiency kitchene"] <- "efficiency kitchen"
+HousingData$kitchen_type[HousingData$kitchen_type == "efficiency ktchen"] <- "efficiency kitchen"
+HousingData$kitchen_type[HousingData$kitchen_type == "efficiency kitchen"] <- "efficiency"
+HousingData$kitchen_type = factor(HousingData$kitchen_type)
+levels(HousingData$kitchen_type)
+table(HousingData$kitchen_type)
+
+#dining_room_type:
+
+table(HousingData$dining_room_type)
+
+HousingData$dining_room_type= factor(HousingData$dining_room_type)
+levels(HousingData$dining_room_type)
+
+#fuel_type: 
+
+table(HousingData$fuel_type)
+
+HousingData$fuel_type= factor(HousingData$fuel_type)
+levels(HousingData$fuel_type)
+
+```
+Remove $ symbol and make certain variables describing money, numeric:
+```{r}
+#Maintenance_Cost
+HousingData$maintenance_cost=as.numeric(gsub("[$,]","",HousingData$maintenance_cost))
+#Sale_Price
+HousingData$sale_price=as.numeric(gsub("[$,]","",HousingData$sale_price))
+
+#Listing_price
+HousingData$listing_price_to_nearest_1000=as.numeric(gsub("[$,]","",HousingData$listing_price_to_nearest_1000))
+```
+Delete some more unnecessary columns:
+```{r}
+HousingData %<>%
+   select(-c(model_type, community_district_num,parking_charges))
+
+str(HousingData)
+colMeans(is.na(HousingData))
+```
+Combine the listing_price and sale_price columns:
+```{r}
+#I observed that for almost all NA in sale_price, there is a value available in the listing_price column and vice versa. For this reason, if we combine these two columns into one sale_price column, we have a more accurate way of handling the 76% of data that is missing in sale_price. The listing price is the amount that the seller has listed the house for whereas sale price is what it actually sells for. The two can differ slightly however combining the two columns into one is still better than imputing 76% of the missing data in sale_price, with an average. 
+
+#This code is commented out because after some testing I realized it didn't work however, I did not delete it because it is worth returning back too and testing properly, given more time. 
+
+HousingData$listing_price_to_nearest_1000<-1000*(HousingData$listing_price_to_nearest_1000)
+#rename to listing price
+HousingData = HousingData %>%
+  rename(
+   listing_price = listing_price_to_nearest_1000
+   )
+
+#combine listing_price and sale_price into one column
+HousingData = HousingData %>%
+ mutate(Sale_price= coalesce(HousingData$sale_price, HousingData$listing_price))
+
+HousingData %<>%
+  select(-c(sale_price,listing_price))
+
+print(HousingData)
+colMeans(is.na(HousingData))
+```
+Drop all the rows that don't have a Sale_price 
+
+```{r}
+HousingData = HousingData[!is.na(HousingData$Sale_price), ]
+colMeans(is.na(HousingData))
+```
+
+Deriving only zip code from URL and full_address_or_zip_code and removing those columns:
+
+```{r}
+HousingData$zip_code <- gsub("http://www.mlsli.com/homes-for-sale/address-not-available-from-broker-Flushing-NY-", "", HousingData$URL)
+
+#print(HousingData$zip_code )
+a = sapply(HousingData$URL,substring,45,150)
+HousingData$zip_code=as.numeric(str_extract(a,"\\d{5}"))
+
+#remove URL, url, and full_address_or_zip_code
+HousingData %<>%
+  select(-c(url,URL,full_address_or_zip_code))
+
+colMeans(is.na(HousingData))
+```
+Adding some new features: 
+```{r}
+#price_per_square_foot 
+HousingData = HousingData %>%
+ mutate(price_per_square_foot= as.integer(HousingData$Sale_price / HousingData$sq_footage))
+
+#age_of_house
+HousingData = HousingData %>%
+ mutate(age_of_house_as_of_2022= 2022 - HousingData$approx_year_built)
+
+#removing approx_year_built and sq_footage since we don't need it anymore
+HousingData %<>%
+  select(-c(approx_year_built,sq_footage))
+
+```
+Imputing missing data:
+```{r}
+colMeans(is.na(HousingData))
+
+y = HousingData$Sale_price
+
+#select all the columns besides sale_price
+X = HousingData %>% 
+  select( -Sale_price)
+
+#create a matrix for missingness
+M = tbl_df(apply(is.na(X), 2, as.numeric))
+colnames(M) = paste("is_missing_", colnames(X), sep = "")
+M
+
+#remove features that didn't have missingness
+M=tbl_df(t(unique(t(M))))
+M %<>% 
+  select_if(function(x){sum(x)>0})
+M
+
+#impute using missForest
+Ximp=missForest(data.frame(X), sampsize=rep(200, ncol(X)))$Ximp
+Ximp = missForest(data.frame(X), sampsize = rep(200, ncol(X)))$ximp
+Ximp_and_missing_dummies = data.frame(cbind(Ximp, M))
+newdata = cbind(Ximp_and_missing_dummies, y)
+
+newdata %<>%
+  rename(sale_price = y) 
+
+HousingData=newdata
+colMeans(is.na(newdata))
+```
+Summary of my data: 
+```{r}
+
+colMeans(is.na(HousingData)) 
+
+
+
+# Histogram of Sale_Price
+ggplot(HousingData, aes(y=sale_price)) + 
+  geom_histogram(color="black", fill="white")
+
+#Bar graph showing relationship between age of house and sale_price 
+ggplot(data=HousingData, aes(x=age_of_house_as_of_2022, y=sale_price)) +
+    geom_bar(colour="black", stat="identity")
+
+str(HousingData)
+
+
+# cats_allowed                         : categorical (binomial)
+#  $ coop_condo                        : categorical (binomial)
+#  $ dining_room_type                  : categorical (nominal)
+#  $ dogs_allowed                      : nominal (binomial)
+#  $ fuel_type                         : categorical (nominal)
+#  $ kitchen_type                      : categorical (nominal)
+#  $ maintenance_cost                  : continuous
+#  $ num_bedrooms                      : discrete
+#  $ num_floors_in_building            : discrete
+#  $ num_full_bathrooms                : discrete
+#  $ num_total_rooms                   : discrete
+#  $ walk_score                        : discrete
+#  $ zip_code                          : categorical (nominal)
+#  $ price_per_square_foot             : continuous
+#  $ age_of_house_as_of_2022           : discrete
+
+summary(HousingData)
+
+library("psych")
+describe(HousingData$num_bedrooms)
+describe(HousingData$num_floors_in_building)
+describe(HousingData$num_full_bathrooms)
+describe(HousingData$num_total_rooms)
+describe(HousingData$price_per_square_foot)
+describe(HousingData$walk_score)
+describe(HousingData$maintenance_cost)
+describe(HousingData$sale_price)
+
+# cats_allowed                         : categorical (binomial)
+#  $ coop_condo                        : categorical (binomial)
+#  $ dining_room_type                  : categorical (nominal)
+#  $ dogs_allowed                      : nominal (binomial)
+#  $ fuel_type                         : categorical (nominal)
+#  $ kitchen_type                      : categorical (nominal)
+
+
+table(HousingData$cats_allowed)
+ggplot(HousingData, aes(x=cats_allowed)) + 
+  geom_histogram(color="black", fill="white",bins = 2)
+
+
+table(HousingData$dogs_allowed)
+ggplot(HousingData, aes(x=dogs_allowed)) + 
+  geom_histogram(color="black", fill="red",bins = 2)
+
+table(HousingData$dining_room_type)
+table(HousingData$fuel_type)
+
+ggplot(data=HousingData, aes(x=dining_room_type, y=sale_price)) +
+    geom_bar(colour="black", stat="identity")
+
+table(HousingData$kitchen_type)
+ggplot(data=HousingData, aes(x=kitchen_type, y=sale_price)) +
+    geom_bar(colour="black", stat="identity")
+
+table(HousingData$coop_condo)
+ggplot(HousingData, aes(x=coop_condo)) + 
+  geom_histogram(color="black", fill="darkgreen",bins = 2)
+```
+First, split the data into training and test set
+```{r}
+data_split = sort(sample(nrow(HousingData),nrow(HousingData)*.8))
+
+train = HousingData[data_split,]
+y_train = train$sale_price
+X_train = subset(train, select=-c(sale_price))
+
+test = HousingData[-data_split,]
+y_test = test$sale_price
+X_test = subset(test, select=-c(sale_price))
+
+linear_model = lm(y_train ~ . ,data= X_train)
+summary(linear_model)
+```
+#Linear Regression Model:
+```{r}
+yhat = predict(linear_model, test)
+summary(yhat)
+```
+Prediction errors:
+```{r}
+predictions = data.frame(cbind(true_value=test$sale_price, predicted=yhat))
+predictions
+predictions$e2=(predictions$true_value-predictions$predicted)^2
+print(predictions)
+summary(test$sale_price)
+summary(predictions$predicted)
+MSE = mean((predictions$true_value - predictions$predicted)^2,na.rm=TRUE)
+RMSE = sqrt(mean((predictions$true_value - predictions$predicted)^2,na.rm=TRUE))
+MSE 
+RMSE 
+```
+#Regression Tree: 
+```{r}
+library(rpart) #for fitting decision trees
+library(rpart.plot) #for plotting decision trees
+
+#We should have split our data into training and testing using something similar to this below but it didn't work with rpart so I'll just be using the original data. 
+
+# test_prop = 0.1
+# train_indices = sample(1 : nrow(HousingData), round((1 - test_prop) * nrow(HousingData)))
+# train_indices
+# HousingData_train = HousingData[train_indices, ]
+# y_train = HousingData_train$medv
+# X_train = HousingData_train
+# X_train$medv = NULL
+# n_train = nrow(X_train)
+
+#building tree with a depth of 5
+tree <- rpart(HousingData$sale_price ~ . ,data=HousingData, method="anova", cp=0.0001, maxdepth=5)
+printcp(tree)
+best_cp <- tree$cptable[which.min(tree$cptable[,"xerror"]),"CP"]
+pruned_tree <- prune(tree, cp=best_cp)
+
+#Plotting regression tree 
+pfit <- prp(pruned_tree,
+    faclen=3, #Length of factor level names in splits
+    extra=1, #Display the number of observations that fall in the node
+    cex = 0.7, #size of the text
+    leaf.round = 1 #rounding the corners of the leaf node boxes
+    ) 
+   
+predict(pruned_tree, newdata=HousingData)
+summary(tree) 
+
+```
+
+#Random Forest Model:
+
+```{r}
+data_split = sort(sample(nrow(HousingData),nrow(HousingData)*.8))
+
+train = HousingData[data_split,]
+y_train = train$sale_price
+X_train = subset(train, select=-c(sale_price))
+
+test = HousingData[-data_split,]
+y_test = test$sale_price
+X_test = subset(test, select=-c(sale_price))
+
+pacman::p_load(randomForest)
+train = HousingData[data_split,]
+rf=randomForest(sale_price ~., data=train)
+print(rf)
+attributes(rf)
+
+#Prediction with the random forest model:
+rf_pred = predict(rf, test)
+head(rf_pred)
+
+plot(rf)
+```
+mTry shows the number of variables that are randomly sampled at each split. We can search for the best mTry using the tuneRF() function.
+```{r}
+bestmtry= tuneRF(X_train,
+                y_train,
+                stepFactor=1.5,
+                ntreeTry=250,
+                trace=TRUE,
+                improve = 0.00005)
+print(bestmtry)
+plot(bestmtry)
+```
+Analyzing nodes and variable importance:
+```{r}
+#variable importance:
+varUsed(rf)
+
+#Dotchart of variable importance as measured by a Random Forest
+varImpPlot(rf, sort =TRUE, main = "Variable Importance")
+
+```
+Tuned Random Forest model using optimal mtry:
+```{r}
+rf_tune = randomForest(sale_price ~., 
+                              data=train,
+                              ntree = 250,
+                              mtry = 12,
+                              importance = TRUE)
+
+print(rf_tune)
+
+tuneoriginal = predict(rf_tune, test)
+head(tuneoriginal)
+
+varUsed(rf_tune)
+varImpPlot(rf_tune, sort =TRUE, main = "Variable Importance (Tuned RF)")
+```
+#Error Metrics:
+```{r}
+set.seed(342)
+
+#in sample RMSE and R^2:
+#Original in-sample rf model
+original_is=randomForest(sale_price ~., data=train)
+RMSE_o_insamp = mean(sqrt(original_is$mse))
+Rsquared_o_insamp = mean(original_is$rsq)
+RMSE_o_insamp
+Rsquared_o_insamp
+#Tuned in-sample rf model
+tuned_is = randomForest(sale_price ~., 
+                   data = train,
+                   ntree= 250,
+                   mtry=12,
+                   importance=TRUE)
+RMSE_t_insamp =mean(sqrt(tuned_is$mse))
+Rsquared_t_insamp = mean(tuned_is$rsq)
+RMSE_t_insamp
+Rsquared_t_insamp
+
+#Original out of bag rf model
+original_oob=randomForest(sale_price ~., data=test)
+RMSE_o_oob = mean(sqrt(original_oob$mse))
+Rsquared_o_oob = mean(original_oob$rsq)
+RMSE_o_oob
+Rsquared_o_oob
+#Tuned out of bag rf model:
+tuned_oob = randomForest(sale_price ~., 
+                   data = test,
+                   ntree= 250,
+                   mtry=12,
+                   importance=TRUE)
+RMSE_t_oob =mean(sqrt(tuned_oob$mse))
+Rsquared_t_oob = mean(tuned_oob$rsq)
+RMSE_t_oob
+Rsquared_t_oob
+```
